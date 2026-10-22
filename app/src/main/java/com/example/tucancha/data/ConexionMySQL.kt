@@ -1,9 +1,9 @@
 package com.example.tucancha.data
 
 import com.example.tucancha.model.Court
-import com.example.tucancha.model.PaymentMethod
 import com.example.tucancha.model.Reservation
 import com.example.tucancha.model.ReservationStatus
+import com.example.tucancha.model.PaymentMethod
 import com.example.tucancha.model.SportCategory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -17,11 +17,9 @@ object ConexionMySQL {
     private var puerto: String = "3306"
     private var baseDatos: String = "tucancha_db"
     private var usuarioBD: String = "root"
-    private var claveBD: String = "Fernanda11:11"
+    private var claveBD: String = "root"
 
-    private var modoUsoApi: Boolean = false
-
-    fun cambiarConfiguracion(nuevoHost: String, nuevoPuerto: String = "3306", nuevoUsuario: String = "root", nuevaClave: String = "Fernanda11:11") {
+    fun cambiarConfiguracion(nuevoHost: String, nuevoPuerto: String = "3306", nuevoUsuario: String = "root", nuevaClave: String = "root") {
         host = nuevoHost
         puerto = nuevoPuerto
         usuarioBD = nuevoUsuario
@@ -41,11 +39,9 @@ object ConexionMySQL {
     suspend fun verificarConexion(): Boolean = withContext(Dispatchers.IO) {
         val apiOk = ClienteApiMySQL.verificarConexionServer()
         if (apiOk) {
-            modoUsoApi = true
             return@withContext true
         }
 
-        modoUsoApi = false
         var conn: Connection? = null
         try {
             conn = obtenerConexionJDBC()
@@ -58,10 +54,8 @@ object ConexionMySQL {
     }
 
     suspend fun registrarUsuarioBD(nombre: String, email: String, password: String, rol: String): Boolean = withContext(Dispatchers.IO) {
-        if (modoUsoApi) {
-            val exitoApi = ClienteApiMySQL.registrarUsuarioApi(nombre, email, password, rol)
-            if (exitoApi) return@withContext true
-        }
+        val exitoApi = ClienteApiMySQL.registrarUsuarioApi(nombre, email, password, rol)
+        if (exitoApi) return@withContext true
 
         var conn: Connection? = null
         try {
@@ -84,10 +78,8 @@ object ConexionMySQL {
     }
 
     suspend fun obtenerCanchasBD(): List<Court> = withContext(Dispatchers.IO) {
-        if (modoUsoApi) {
-            val listaApi = ClienteApiMySQL.obtenerCanchasApi()
-            if (listaApi.isNotEmpty()) return@withContext listaApi
-        }
+        val listaApi = ClienteApiMySQL.obtenerCanchasApi()
+        if (listaApi.isNotEmpty()) return@withContext listaApi
 
         val lista = mutableListOf<Court>()
         var conn: Connection? = null
@@ -132,10 +124,8 @@ object ConexionMySQL {
     }
 
     suspend fun guardarReservaBD(reserva: Reservation): Boolean = withContext(Dispatchers.IO) {
-        if (modoUsoApi) {
-            val exitoApi = ClienteApiMySQL.guardarReservaApi(reserva)
-            if (exitoApi) return@withContext true
-        }
+        val exitoApi = ClienteApiMySQL.guardarReservaApi(reserva)
+        if (exitoApi) return@withContext true
 
         var conn: Connection? = null
         try {
@@ -169,10 +159,8 @@ object ConexionMySQL {
     }
 
     suspend fun obtenerReservasBD(canchasMap: Map<String, Court>): List<Reservation> = withContext(Dispatchers.IO) {
-        if (modoUsoApi) {
-            val reservasApi = ClienteApiMySQL.obtenerReservasApi(canchasMap)
-            if (reservasApi.isNotEmpty()) return@withContext reservasApi
-        }
+        val reservasApi = ClienteApiMySQL.obtenerReservasApi(canchasMap)
+        if (reservasApi.isNotEmpty()) return@withContext reservasApi
 
         val lista = mutableListOf<Reservation>()
         var conn: Connection? = null
@@ -229,10 +217,8 @@ object ConexionMySQL {
     }
 
     suspend fun cancelarReservaBD(reservaId: String): Boolean = withContext(Dispatchers.IO) {
-        if (modoUsoApi) {
-            val exitoApi = ClienteApiMySQL.cancelarReservaApi(reservaId)
-            if (exitoApi) return@withContext true
-        }
+        val exitoApi = ClienteApiMySQL.cancelarReservaApi(reservaId)
+        if (exitoApi) return@withContext true
 
         var conn: Connection? = null
         try {
@@ -252,10 +238,8 @@ object ConexionMySQL {
     }
 
     suspend fun obtenerFavoritosBD(): Set<String> = withContext(Dispatchers.IO) {
-        if (modoUsoApi) {
-            val favsApi = ClienteApiMySQL.obtenerFavoritosApi()
-            if (favsApi.isNotEmpty()) return@withContext favsApi
-        }
+        val favsApi = ClienteApiMySQL.obtenerFavoritosApi()
+        if (favsApi.isNotEmpty()) return@withContext favsApi
 
         val conjunto = mutableSetOf<String>()
         var conn: Connection? = null
@@ -278,10 +262,8 @@ object ConexionMySQL {
     }
 
     suspend fun alternarFavoritoBD(canchaId: String, esFavorito: Boolean): Boolean = withContext(Dispatchers.IO) {
-        if (modoUsoApi) {
-            val exitoApi = ClienteApiMySQL.alternarFavoritoApi(canchaId, esFavorito)
-            if (exitoApi) return@withContext true
-        }
+        val exitoApi = ClienteApiMySQL.alternarFavoritoApi(canchaId, esFavorito)
+        if (exitoApi) return@withContext true
 
         var conn: Connection? = null
         try {

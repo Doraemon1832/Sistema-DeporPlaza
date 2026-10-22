@@ -3,21 +3,22 @@
 # ============================================================
 # Este servidor conecta tu MySQL Workbench con la app Android
 # Ejecutar en la consola de tu PC con:
-# python servidor_mysql.py
+# py servidor_mysql.py
 # ============================================================
 
 import json
+import traceback
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import mysql.connector
 
 HOST = "0.0.0.0"
-PORT = 8000
+PORT = 8085
 
 MYSQL_CONFIG = {
     "host": "localhost",
     "port": 3306,
     "user": "root",
-    "password": "Fernanda11:11",
+    "password": "root",
     "database": "tucancha_db"
 }
 
@@ -44,27 +45,31 @@ class APIHandler(BaseHTTPRequestHandler):
 
         cursor = conn.cursor(dictionary=True)
 
-        if self.path == "/api/canchas":
-            cursor.execute("SELECT * FROM canchas")
-            filas = cursor.fetchall()
-            self._responder_json(200, filas)
+        try:
+            if self.path == "/api/canchas":
+                cursor.execute("SELECT * FROM canchas")
+                filas = cursor.fetchall()
+                self._responder_json(200, filas)
 
-        elif self.path == "/api/reservas":
-            cursor.execute("SELECT * FROM reservas ORDER BY creado_en DESC")
-            filas = cursor.fetchall()
-            self._responder_json(200, filas)
+            elif self.path == "/api/reservas":
+                cursor.execute("SELECT * FROM reservas ORDER BY creado_en DESC")
+                filas = cursor.fetchall()
+                self._responder_json(200, filas)
 
-        elif self.path == "/api/favoritos":
-            cursor.execute("SELECT cancha_id FROM favoritos")
-            filas = cursor.fetchall()
-            ids = [f["cancha_id"] for f in filas]
-            self._responder_json(200, ids)
+            elif self.path == "/api/favoritos":
+                cursor.execute("SELECT cancha_id FROM favoritos")
+                filas = cursor.fetchall()
+                ids = [f["cancha_id"] for f in filas]
+                self._responder_json(200, ids)
 
-        else:
-            self._responder_json(404, {"error": "Ruta no encontrada"})
-
-        cursor.close()
-        conn.close()
+            else:
+                self._responder_json(404, {"error": "Ruta no encontrada"})
+        except Exception as e:
+            print(f"Error en GET {self.path}: {e}")
+            self._responder_json(500, {"error": str(e)})
+        finally:
+            cursor.close()
+            conn.close()
 
     def do_POST(self):
         conn = obtener_conexion_mysql()
@@ -72,61 +77,71 @@ class APIHandler(BaseHTTPRequestHandler):
             self._responder_json(500, {"error": "No se pudo conectar a MySQL Workbench"})
             return
 
-        content_length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(content_length)
-        data = json.loads(body.decode('utf-8'))
         cursor = conn.cursor()
 
-        if self.path == "/api/usuarios":
-            sql = """INSERT INTO usuarios (nombre, email, password, rol)
-                     VALUES (%s, %s, %s, %s)
-                     ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), password = VALUES(password)"""
-            val = (
-                data["nombre"],
-                data["email"],
-                data["password"],
-                data.get("rol", "USUARIO")
-            )
-            cursor.execute(sql, val)
-            conn.commit()
-            self._responder_json(201, {"mensaje": "Usuario registrado correctamente"})
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode('utf-8'))
+            print(f"Peticion POST recibida en {self.path}: {data}")
 
-        elif self.path == "/api/reservas":
-            sql = """INSERT INTO reservas (id, recibo_codigo, cancha_id, usuario_nombre, fecha, dia_nombre, hora_inicio, duracion_horas, precio_total, metodo_pago, codigo_operacion, celular, estado, creado_en)
-                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                     ON DUPLICATE KEY UPDATE estado = VALUES(estado)"""
-            val = (
-                data["id"],
-                data.get("recibo_codigo", "DP-0001055"),
-                data["cancha_id"],
-                data.get("usuario_nombre", "Alejandro Torres"),
-                data["fecha"],
-                data.get("dia_nombre", ""),
-                data["hora_inicio"],
-                data["duracion_horas"],
-                data["precio_total"],
-                data.get("metodo_pago", "YAPE"),
-                data.get("codigo_operacion", ""),
-                data.get("celular", ""),
-                data.get("estado", "CONFIRMADA"),
-                data.get("creado_en", 0)
-            )
-            cursor.execute(sql, val)
-            conn.commit()
-            self._responder_json(201, {"mensaje": "Reserva guardada correctamente"})
+            if self.path == "/api/usuarios":
+                sql = """INSERT INTO usuarios (nombre, email, password, rol)
+                         VALUES (%s, %s, %s, %s)
+                         ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), password = VALUES(password)"""
+                val = (
+                    data["nombre"],
+                    data["email"],
+                    data["password"],
+                    data.get("rol", "USUARIO")
+                )
+                cursor.execute(sql, val)
+                conn.commit()
+                print("Usuario registrado exitosamente")
+                self._responder_json(201, {"mensaje": "Usuario registrado correctamente"})
 
-        elif self.path == "/api/favoritos":
-            cancha_id = data["cancha_id"]
-            cursor.execute("DELETE FROM favoritos WHERE cancha_id = %s", (cancha_id,))
-            cursor.execute("INSERT INTO favoritos (cancha_id) VALUES (%s)", (cancha_id,))
-            conn.commit()
-            self._responder_json(200, {"mensaje": "Favorito guardado"})
+            elif self.path == "/api/reservas":
+                sql = """INSERT INTO reservas (id, recibo_codigo, cancha_id, usuario_nombre, fecha, dia_nombre, hora_inicio, duracion_horas, precio_total, metodo_pago, codigo_operacion, celular, estado, creado_en)
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                         ON DUPLICATE KEY UPDATE estado = VALUES(estado)"""
+                val = (
+                    str(data["id"]),
+                    str(data.get("recibo_codigo", "DP-0001055")),
+                    str(data["cancha_id"]),
+                    str(data.get("usuario_nombre", "Alejandro Torres")),
+                    str(data["fecha"]),
+                    str(data.get("dia_nombre", "")),
+                    str(data["hora_inicio"]),
+                    float(data["duracion_horas"]),
+                    int(data["precio_total"]),
+                    str(data.get("metodo_pago", "YAPE")),
+                    str(data.get("codigo_operacion", "")),
+                    str(data.get("celular", "")),
+                    str(data.get("estado", "CONFIRMADA")),
+                    int(data.get("creado_en", 0))
+                )
+                cursor.execute(sql, val)
+                conn.commit()
+                print("Reserva guardada exitosamente en MySQL Workbench")
+                self._responder_json(201, {"mensaje": "Reserva guardada correctamente"})
 
-        else:
-            self._responder_json(404, {"error": "Ruta no encontrada"})
+            elif self.path == "/api/favoritos":
+                cancha_id = str(data["cancha_id"])
+                cursor.execute("DELETE FROM favoritos WHERE cancha_id = %s", (cancha_id,))
+                cursor.execute("INSERT INTO favoritos (cancha_id) VALUES (%s)", (cancha_id,))
+                conn.commit()
+                print("Favorito guardado exitosamente")
+                self._responder_json(200, {"mensaje": "Favorito guardado"})
 
-        cursor.close()
-        conn.close()
+            else:
+                self._responder_json(404, {"error": "Ruta no encontrada"})
+        except Exception as e:
+            print(f"Error en POST {self.path}: {e}")
+            traceback.print_exc()
+            self._responder_json(500, {"error": str(e)})
+        finally:
+            cursor.close()
+            conn.close()
 
     def do_DELETE(self):
         conn = obtener_conexion_mysql()
@@ -136,26 +151,31 @@ class APIHandler(BaseHTTPRequestHandler):
 
         cursor = conn.cursor()
 
-        if self.path.startswith("/api/reservas/"):
-            reserva_id = self.path.split("/")[-1]
-            cursor.execute("DELETE FROM reservas WHERE id = %s", (reserva_id,))
-            conn.commit()
-            self._responder_json(200, {"mensaje": "Reserva eliminada"})
+        try:
+            if self.path.startswith("/api/reservas/"):
+                reserva_id = self.path.split("/")[-1]
+                cursor.execute("DELETE FROM reservas WHERE id = %s", (reserva_id,))
+                conn.commit()
+                print(f"Reserva {reserva_id} eliminada")
+                self._responder_json(200, {"mensaje": "Reserva eliminada"})
 
-        elif self.path == "/api/favoritos":
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
-            data = json.loads(body.decode('utf-8'))
-            cancha_id = data["cancha_id"]
-            cursor.execute("DELETE FROM favoritos WHERE cancha_id = %s", (cancha_id,))
-            conn.commit()
-            self._responder_json(200, {"mensaje": "Favorito eliminado"})
+            elif self.path == "/api/favoritos":
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length)
+                data = json.loads(body.decode('utf-8'))
+                cancha_id = str(data["cancha_id"])
+                cursor.execute("DELETE FROM favoritos WHERE cancha_id = %s", (cancha_id,))
+                conn.commit()
+                self._responder_json(200, {"mensaje": "Favorito eliminado"})
 
-        else:
-            self._responder_json(404, {"error": "Ruta no encontrada"})
-
-        cursor.close()
-        conn.close()
+            else:
+                self._responder_json(404, {"error": "Ruta no encontrada"})
+        except Exception as e:
+            print(f"Error en DELETE {self.path}: {e}")
+            self._responder_json(500, {"error": str(e)})
+        finally:
+            cursor.close()
+            conn.close()
 
 if __name__ == "__main__":
     print(f"============================================================")

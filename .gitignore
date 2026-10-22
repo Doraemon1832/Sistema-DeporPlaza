@@ -16,3 +16,9 @@ local.properties
 google-services.json
 *.jks
 *.keystore
+.kotlin/
+.idea/vcs.xml
+application.backup
+.kotlin/
+.idea/vcs.xml
+application.backup

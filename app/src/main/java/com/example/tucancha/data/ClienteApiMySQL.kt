@@ -17,7 +17,7 @@ import java.net.URL
 
 object ClienteApiMySQL {
 
-    private var baseUrl: String = "http://10.0.2.2:8000/api"
+    private var baseUrl: String = "http://10.0.2.2:8085/api"
 
     fun cambiarBaseUrl(nuevaUrl: String) {
         baseUrl = nuevaUrl

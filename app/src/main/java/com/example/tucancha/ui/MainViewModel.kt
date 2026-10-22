@@ -89,9 +89,11 @@ class MainViewModel : ViewModel() {
 
     fun registerUser(name: String, email: String, password: String, role: UserRole) {
         login(name, email, role)
-        if (_esMySQLConectado.value) {
-            viewModelScope.launch {
-                ConexionMySQL.registrarUsuarioBD(name, email, password, role.name)
+        viewModelScope.launch {
+            val exito = ConexionMySQL.registrarUsuarioBD(name, email, password, role.name)
+            if (exito) {
+                _esMySQLConectado.value = true
+                _estadoConexion.value = "Conectado a MySQL Workbench (tucancha_db)"
             }
         }
     }
@@ -146,9 +148,11 @@ class MainViewModel : ViewModel() {
             _favoriteCourtIds.value + courtId
         }
 
-        if (_esMySQLConectado.value) {
-            viewModelScope.launch {
-                ConexionMySQL.alternarFavoritoBD(courtId, nuevoEstado)
+        viewModelScope.launch {
+            val exito = ConexionMySQL.alternarFavoritoBD(courtId, nuevoEstado)
+            if (exito) {
+                _esMySQLConectado.value = true
+                _estadoConexion.value = "Conectado a MySQL Workbench (tucancha_db)"
             }
         }
     }
@@ -225,9 +229,12 @@ class MainViewModel : ViewModel() {
         _selectedCourtForBooking.value = null
         _isPaymentStepOpen.value = false
 
-        if (_esMySQLConectado.value) {
-            viewModelScope.launch {
-                ConexionMySQL.guardarReservaBD(newReservation)
+        // Intentar guardar en MySQL de inmediato
+        viewModelScope.launch {
+            val exito = ConexionMySQL.guardarReservaBD(newReservation)
+            if (exito) {
+                _esMySQLConectado.value = true
+                _estadoConexion.value = "Conectado a MySQL Workbench (tucancha_db)"
             }
         }
     }
@@ -239,10 +246,8 @@ class MainViewModel : ViewModel() {
     fun cancelReservation(reservationId: String) {
         _reservations.value = _reservations.value.filter { it.id != reservationId }
 
-        if (_esMySQLConectado.value) {
-            viewModelScope.launch {
-                ConexionMySQL.cancelarReservaBD(reservationId)
-            }
+        viewModelScope.launch {
+            ConexionMySQL.cancelarReservaBD(reservationId)
         }
     }
 
@@ -255,12 +260,10 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        if (_esMySQLConectado.value) {
-            viewModelScope.launch {
-                val res = _reservations.value.find { it.id == reservationId }
-                if (res != null) {
-                    ConexionMySQL.guardarReservaBD(res)
-                }
+        viewModelScope.launch {
+            val res = _reservations.value.find { it.id == reservationId }
+            if (res != null) {
+                ConexionMySQL.guardarReservaBD(res)
             }
         }
     }
