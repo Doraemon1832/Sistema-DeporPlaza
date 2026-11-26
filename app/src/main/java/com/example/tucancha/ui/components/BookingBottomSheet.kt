@@ -38,12 +38,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.tucancha.data.MockData
 import com.example.tucancha.model.Court
 import com.example.tucancha.model.DayOption
+import com.example.tucancha.model.Reservation
+import com.example.tucancha.model.ReservationStatus
 import com.example.tucancha.ui.theme.DarkCardBorder
 import com.example.tucancha.ui.theme.DarkSurface
 import com.example.tucancha.ui.theme.DeporYellowPrimary
@@ -56,6 +59,7 @@ import com.example.tucancha.ui.theme.UnavailableButtonText
 @Composable
 fun BookingBottomSheet(
     court: Court,
+    existingReservations: List<Reservation>,
     selectedDay: DayOption,
     onDaySelected: (DayOption) -> Unit,
     selectedTimeSlot: String?,
@@ -66,6 +70,12 @@ fun BookingBottomSheet(
     onDismissRequest: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Calculate taken slots for selected court & day
+    val occupiedTimeSlots = existingReservations
+        .filter { it.court.id == court.id && it.date == selectedDay.fullDate && it.status != ReservationStatus.CANCELADA }
+        .map { it.startTime }
+        .toSet()
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -209,13 +219,28 @@ fun BookingBottomSheet(
             Spacer(modifier = Modifier.height(20.dp))
 
             // HORA DE INICIO
-            Text(
-                text = "HORA DE INICIO",
-                color = TextSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "HORA DE INICIO",
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+
+                if (occupiedTimeSlots.isNotEmpty()) {
+                    Text(
+                        text = "🔒 ${occupiedTimeSlots.size} turno(s) ocupado(s)",
+                        color = Color(0xFFFFB74D),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(10.dp))
 
             LazyVerticalGrid(
@@ -227,24 +252,52 @@ fun BookingBottomSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(MockData.sampleTimeSlots) { time ->
-                    val isSelected = time == selectedTimeSlot
+                    val isOccupied = occupiedTimeSlots.contains(time)
+                    val isSelected = time == selectedTimeSlot && !isOccupied
                     val shape = RoundedCornerShape(10.dp)
+
+                    val bgColor = when {
+                        isOccupied -> Color(0xFF2C2424)
+                        isSelected -> DeporYellowPrimary
+                        else -> Color(0xFF1E2328)
+                    }
+
+                    val borderColor = when {
+                        isOccupied -> Color(0xFF5A2A2A)
+                        isSelected -> DeporYellowPrimary
+                        else -> DarkCardBorder
+                    }
 
                     Box(
                         modifier = Modifier
                             .clip(shape)
-                            .background(if (isSelected) DeporYellowPrimary else Color(0xFF1E2328))
-                            .border(1.dp, if (isSelected) DeporYellowPrimary else DarkCardBorder, shape)
-                            .clickable { onTimeSlotSelected(time) }
+                            .background(bgColor)
+                            .border(1.dp, borderColor, shape)
+                            .clickable(enabled = !isOccupied) { onTimeSlotSelected(time) }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = time,
-                            color = if (isSelected) Color.Black else TextPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = time,
+                                color = when {
+                                    isOccupied -> Color(0xFF886666)
+                                    isSelected -> Color.Black
+                                    else -> TextPrimary
+                                },
+                                fontSize = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                textDecoration = if (isOccupied) TextDecoration.LineThrough else TextDecoration.None
+                            )
+                            if (isOccupied) {
+                                Text(
+                                    text = "Ocupado",
+                                    color = Color(0xFFEF5350),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -343,7 +396,7 @@ fun BookingBottomSheet(
             Spacer(modifier = Modifier.height(20.dp))
 
             // Button Continuar al pago
-            val isButtonEnabled = selectedTimeSlot != null
+            val isButtonEnabled = selectedTimeSlot != null && !occupiedTimeSlots.contains(selectedTimeSlot)
             Button(
                 onClick = onContinueToPaymentClick,
                 enabled = isButtonEnabled,

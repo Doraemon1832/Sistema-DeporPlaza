@@ -38,6 +38,42 @@ object ClienteApiMySQL {
         }
     }
 
+    suspend fun autenticarUsuarioApi(email: String, password: String, rol: String): JSONObject? = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$baseUrl/login")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+
+            val json = JSONObject().apply {
+                put("email", email)
+                put("password", password)
+                put("rol", rol)
+            }
+
+            val writer = OutputStreamWriter(conn.outputStream)
+            writer.write(json.toString())
+            writer.flush()
+            writer.close()
+
+            if (conn.responseCode == 200) {
+                val reader = BufferedReader(InputStreamReader(conn.inputStream))
+                val respuesta = reader.readText()
+                reader.close()
+                conn.disconnect()
+                return@withContext JSONObject(respuesta)
+            }
+            conn.disconnect()
+            null
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            null
+        }
+    }
+
     suspend fun registrarUsuarioApi(nombre: String, email: String, password: String, rol: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val url = URL("$baseUrl/usuarios")
@@ -63,6 +99,55 @@ object ClienteApiMySQL {
             val code = conn.responseCode
             conn.disconnect()
             code in 200..201
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun actualizarPerfilApi(oldEmail: String, oldNombre: String, newNombre: String, newEmail: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$baseUrl/usuarios/actualizar")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.requestMethod = "PUT"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+
+            val json = JSONObject().apply {
+                put("old_email", oldEmail)
+                put("old_nombre", oldNombre)
+                put("new_nombre", newNombre)
+                put("new_email", newEmail)
+            }
+
+            val writer = OutputStreamWriter(conn.outputStream)
+            writer.write(json.toString())
+            writer.flush()
+            writer.close()
+
+            val code = conn.responseCode
+            conn.disconnect()
+            code in 200..204
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun eliminarCuentaApi(email: String, nombre: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$baseUrl/usuarios/$email")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.requestMethod = "DELETE"
+            conn.setRequestProperty("Usuario-Nombre", nombre)
+
+            val code = conn.responseCode
+            conn.disconnect()
+            code in 200..204
         } catch (t: Throwable) {
             t.printStackTrace()
             false

@@ -1,14 +1,16 @@
 package com.example.tucancha.data
 
 import com.example.tucancha.model.Court
+import com.example.tucancha.model.PaymentMethod
 import com.example.tucancha.model.Reservation
 import com.example.tucancha.model.ReservationStatus
-import com.example.tucancha.model.PaymentMethod
 import com.example.tucancha.model.SportCategory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.sql.Connection
 import java.sql.DriverManager
+import java.sql.PreparedStatement
 import java.sql.ResultSet
 
 object ConexionMySQL {
@@ -17,9 +19,9 @@ object ConexionMySQL {
     private var puerto: String = "3306"
     private var baseDatos: String = "tucancha_db"
     private var usuarioBD: String = "root"
-    private var claveBD: String = "root"
+    private var claveBD: String = "Fernanda11:11"
 
-    fun cambiarConfiguracion(nuevoHost: String, nuevoPuerto: String = "3306", nuevoUsuario: String = "root", nuevaClave: String = "root") {
+    fun cambiarConfiguracion(nuevoHost: String, nuevoPuerto: String = "3306", nuevoUsuario: String = "root", nuevaClave: String = "Fernanda11:11") {
         host = nuevoHost
         puerto = nuevoPuerto
         usuarioBD = nuevoUsuario
@@ -53,8 +55,53 @@ object ConexionMySQL {
         }
     }
 
+    suspend fun autenticarUsuarioBD(email: String, password: String, rol: String): JSONObject? = withContext(Dispatchers.IO) {
+        val cleanEmail = email.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+        val cleanPassword = password.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+
+        val jsonApi = ClienteApiMySQL.autenticarUsuarioApi(cleanEmail, cleanPassword, rol)
+        if (jsonApi != null) return@withContext jsonApi
+
+        var conn: Connection? = null
+        try {
+            conn = obtenerConexionJDBC() ?: return@withContext null
+            val sql = "SELECT id, nombre, email, rol FROM usuarios WHERE LOWER(email) = LOWER(?) AND password = ? AND rol = ?"
+            val stmt: PreparedStatement = conn.prepareStatement(sql)
+            stmt.setString(1, cleanEmail)
+            stmt.setString(2, cleanPassword)
+            stmt.setString(3, rol)
+            val rs: ResultSet = stmt.executeQuery()
+
+            if (rs.next()) {
+                val userObj = JSONObject().apply {
+                    put("id", rs.getString("id"))
+                    put("nombre", rs.getString("nombre"))
+                    put("email", rs.getString("email"))
+                    put("rol", rs.getString("rol"))
+                }
+                rs.close()
+                stmt.close()
+                return@withContext JSONObject().apply {
+                    put("exito", true)
+                    put("usuario", userObj)
+                }
+            }
+            rs.close()
+            stmt.close()
+        } catch (t: Throwable) {
+            t.printStackTrace()
+        } finally {
+            try { conn?.close() } catch (t: Throwable) {}
+        }
+        null
+    }
+
     suspend fun registrarUsuarioBD(nombre: String, email: String, password: String, rol: String): Boolean = withContext(Dispatchers.IO) {
-        val exitoApi = ClienteApiMySQL.registrarUsuarioApi(nombre, email, password, rol)
+        val cleanNombre = nombre.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+        val cleanEmail = email.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+        val cleanPassword = password.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+
+        val exitoApi = ClienteApiMySQL.registrarUsuarioApi(cleanNombre, cleanEmail, cleanPassword, rol)
         if (exitoApi) return@withContext true
 
         var conn: Connection? = null
@@ -62,13 +109,73 @@ object ConexionMySQL {
             conn = obtenerConexionJDBC() ?: return@withContext false
             val sql = "INSERT INTO usuarios (nombre, email, password, rol) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), password = VALUES(password)"
             val stmt = conn.prepareStatement(sql)
-            stmt.setString(1, nombre)
-            stmt.setString(2, email)
-            stmt.setString(3, password)
+            stmt.setString(1, cleanNombre)
+            stmt.setString(2, cleanEmail)
+            stmt.setString(3, cleanPassword)
             stmt.setString(4, rol)
             val filas = stmt.executeUpdate()
             stmt.close()
             filas > 0
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            false
+        } finally {
+            try { conn?.close() } catch (t: Throwable) {}
+        }
+    }
+
+    suspend fun actualizarPerfilBD(oldEmail: String, oldNombre: String, newNombre: String, newEmail: String): Boolean = withContext(Dispatchers.IO) {
+        val cleanNewNombre = newNombre.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+        val cleanNewEmail = newEmail.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+
+        val exitoApi = ClienteApiMySQL.actualizarPerfilApi(oldEmail, oldNombre, cleanNewNombre, cleanNewEmail)
+        if (exitoApi) return@withContext true
+
+        var conn: Connection? = null
+        try {
+            conn = obtenerConexionJDBC() ?: return@withContext false
+            val sqlUser = "UPDATE usuarios SET nombre = ?, email = ? WHERE LOWER(email) = LOWER(?)"
+            val stmtUser = conn.prepareStatement(sqlUser)
+            stmtUser.setString(1, cleanNewNombre)
+            stmtUser.setString(2, cleanNewEmail)
+            stmtUser.setString(3, oldEmail)
+            stmtUser.executeUpdate()
+            stmtUser.close()
+
+            val sqlRes = "UPDATE reservas SET usuario_nombre = ? WHERE usuario_nombre = ?"
+            val stmtRes = conn.prepareStatement(sqlRes)
+            stmtRes.setString(1, cleanNewNombre)
+            stmtRes.setString(2, oldNombre)
+            stmtRes.executeUpdate()
+            stmtRes.close()
+            true
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            false
+        } finally {
+            try { conn?.close() } catch (t: Throwable) {}
+        }
+    }
+
+    suspend fun eliminarCuentaBD(email: String, nombre: String): Boolean = withContext(Dispatchers.IO) {
+        val exitoApi = ClienteApiMySQL.eliminarCuentaApi(email, nombre)
+        if (exitoApi) return@withContext true
+
+        var conn: Connection? = null
+        try {
+            conn = obtenerConexionJDBC() ?: return@withContext false
+            val sqlUser = "DELETE FROM usuarios WHERE LOWER(email) = LOWER(?)"
+            val stmtUser = conn.prepareStatement(sqlUser)
+            stmtUser.setString(1, email)
+            stmtUser.executeUpdate()
+            stmtUser.close()
+
+            val sqlRes = "DELETE FROM reservas WHERE LOWER(usuario_nombre) = LOWER(?)"
+            val stmtRes = conn.prepareStatement(sqlRes)
+            stmtRes.setString(1, nombre)
+            stmtRes.executeUpdate()
+            stmtRes.close()
+            true
         } catch (t: Throwable) {
             t.printStackTrace()
             false

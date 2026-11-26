@@ -37,7 +37,7 @@ class MainViewModel : ViewModel() {
     private val _favoriteCourtIds = MutableStateFlow<Set<String>>(emptySet())
     val favoriteCourtIds: StateFlow<Set<String>> = _favoriteCourtIds.asStateFlow()
 
-    private val _reservations = MutableStateFlow<List<Reservation>>(MockData.sampleReservationsAdmin)
+    private val _reservations = MutableStateFlow<List<Reservation>>(emptyList())
     val reservations: StateFlow<List<Reservation>> = _reservations.asStateFlow()
 
     private val _userProfile = MutableStateFlow(UserProfile())
@@ -75,26 +75,138 @@ class MainViewModel : ViewModel() {
         cargarDatosDesdeMySQL()
     }
 
-    fun login(name: String, email: String, role: UserRole) {
-        _currentRole.value = role
-        _isLoggedIn.value = true
-        _userProfile.value = UserProfile(
-            name = name,
-            email = email,
-            role = role,
-            badge = if (role == UserRole.ADMINISTRADOR) "Super Admin" else "Miembro Premium",
-            avatarLetter = name.firstOrNull()?.uppercase() ?: "A"
-        )
+    fun login(
+        email: String,
+        password: String,
+        role: UserRole,
+        onResult: (exito: Boolean, mensaje: String) -> Unit
+    ) {
+        val cleanEmail = email.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+        val cleanPassword = password.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+
+        if (cleanEmail.isBlank()) {
+            onResult(false, "Ingresa un correo electrónico")
+            return
+        }
+        if (cleanPassword.isBlank()) {
+            onResult(false, "Ingresa tu contraseña")
+            return
+        }
+
+        viewModelScope.launch {
+            val jsonResultado = ConexionMySQL.autenticarUsuarioBD(cleanEmail, cleanPassword, role.name)
+            if (jsonResultado != null && jsonResultado.optBoolean("exito", false)) {
+                val userObj = jsonResultado.optJSONObject("usuario")
+                val nombre = userObj?.optString("nombre") ?: cleanEmail.substringBefore("@")
+                _currentRole.value = role
+                _isLoggedIn.value = true
+                _userProfile.value = UserProfile(
+                    name = nombre,
+                    email = cleanEmail,
+                    role = role,
+                    badge = if (role == UserRole.ADMINISTRADOR) "Super Admin" else "Miembro Premium",
+                    avatarLetter = nombre.firstOrNull()?.uppercase() ?: "A"
+                )
+                onResult(true, "Inicio de sesión exitoso")
+            } else if (!_esMySQLConectado.value) {
+                // Modo fallback offline si no hay MySQL
+                val nombre = if (role == UserRole.ADMINISTRADOR) "Administrador DeporPlaza" else cleanEmail.substringBefore("@")
+                _currentRole.value = role
+                _isLoggedIn.value = true
+                _userProfile.value = UserProfile(
+                    name = nombre,
+                    email = cleanEmail,
+                    role = role,
+                    badge = if (role == UserRole.ADMINISTRADOR) "Super Admin" else "Miembro Premium",
+                    avatarLetter = nombre.firstOrNull()?.uppercase() ?: "A"
+                )
+                onResult(true, "Inicio de sesión offline")
+            } else {
+                onResult(false, "Correo o contraseña incorrectos")
+            }
+        }
     }
 
-    fun registerUser(name: String, email: String, password: String, role: UserRole) {
-        login(name, email, role)
+    fun registerUser(
+        name: String,
+        email: String,
+        password: String,
+        role: UserRole,
+        onResult: (exito: Boolean, mensaje: String) -> Unit
+    ) {
+        val cleanName = name.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+        val cleanEmail = email.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+        val cleanPassword = password.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+
+        if (cleanName.isBlank()) {
+            onResult(false, "Ingresa tu nombre completo")
+            return
+        }
+        if (cleanEmail.isBlank()) {
+            onResult(false, "Ingresa un correo válido")
+            return
+        }
+        if (cleanPassword.length < 4) {
+            onResult(false, "La contraseña debe tener al menos 4 caracteres")
+            return
+        }
+
         viewModelScope.launch {
-            val exito = ConexionMySQL.registrarUsuarioBD(name, email, password, role.name)
-            if (exito) {
-                _esMySQLConectado.value = true
-                _estadoConexion.value = "Conectado a MySQL Workbench (tucancha_db)"
+            ConexionMySQL.registrarUsuarioBD(cleanName, cleanEmail, cleanPassword, role.name)
+            _currentRole.value = role
+            _isLoggedIn.value = true
+            _userProfile.value = UserProfile(
+                name = cleanName,
+                email = cleanEmail,
+                role = role,
+                badge = if (role == UserRole.ADMINISTRADOR) "Super Admin" else "Miembro Premium",
+                avatarLetter = cleanName.firstOrNull()?.uppercase() ?: "A"
+            )
+            onResult(true, "Registro exitoso")
+        }
+    }
+
+    fun updateUserProfile(newNombre: String, newEmail: String, onResult: (exito: Boolean, mensaje: String) -> Unit) {
+        val oldNombre = _userProfile.value.name
+        val oldEmail = _userProfile.value.email
+
+        val cleanNombre = newNombre.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+        val cleanEmail = newEmail.replace(Regex("['\";\\-\\-\\/\\*]"), "").trim()
+
+        if (cleanNombre.isBlank() || cleanEmail.isBlank()) {
+            onResult(false, "Nombre y correo no pueden estar vacíos")
+            return
+        }
+
+        viewModelScope.launch {
+            ConexionMySQL.actualizarPerfilBD(oldEmail, oldNombre, cleanNombre, cleanEmail)
+            _userProfile.value = _userProfile.value.copy(
+                name = cleanNombre,
+                email = cleanEmail,
+                avatarLetter = cleanNombre.firstOrNull()?.uppercase() ?: "A"
+            )
+            _reservations.value = _reservations.value.map {
+                if (it.userName.equals(oldNombre, ignoreCase = true)) {
+                    it.copy(userName = cleanNombre)
+                } else {
+                    it
+                }
             }
+            onResult(true, "Perfil actualizado correctamente")
+        }
+    }
+
+    fun deleteUserAccount(onResult: (exito: Boolean) -> Unit) {
+        val userEmail = _userProfile.value.email
+        val userNombre = _userProfile.value.name
+
+        viewModelScope.launch {
+            ConexionMySQL.eliminarCuentaBD(userEmail, userNombre)
+            _reservations.value = _reservations.value.filter {
+                !it.userName.equals(userNombre, ignoreCase = true)
+            }
+            logout()
+            onResult(true)
         }
     }
 
@@ -229,7 +341,6 @@ class MainViewModel : ViewModel() {
         _selectedCourtForBooking.value = null
         _isPaymentStepOpen.value = false
 
-        // Intentar guardar en MySQL de inmediato
         viewModelScope.launch {
             val exito = ConexionMySQL.guardarReservaBD(newReservation)
             if (exito) {

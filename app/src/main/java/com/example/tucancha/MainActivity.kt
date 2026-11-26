@@ -62,8 +62,19 @@ fun TuCanchaApp(viewModel: MainViewModel) {
 
     if (!isLoggedIn) {
         LoginScreen(
-            onLoginSuccess = { name, email, role ->
-                viewModel.registerUser(name, email, "123456", role)
+            onLoginClick = { email, password, role, onError ->
+                viewModel.login(email, password, role) { exito, mensaje ->
+                    if (!exito) {
+                        onError(mensaje)
+                    }
+                }
+            },
+            onRegisterClick = { name, email, password, role, onError ->
+                viewModel.registerUser(name, email, password, role) { exito, mensaje ->
+                    if (!exito) {
+                        onError(mensaje)
+                    }
+                }
             }
         )
     } else if (currentRole == UserRole.ADMINISTRADOR) {
@@ -112,6 +123,12 @@ fun TuCanchaApp(viewModel: MainViewModel) {
                         userProfile = userProfile,
                         reservations = reservations,
                         onCancelReservation = { viewModel.cancelReservation(it) },
+                        onUpdateProfile = { newNombre, newEmail, onResult ->
+                            viewModel.updateUserProfile(newNombre, newEmail, onResult)
+                        },
+                        onDeleteAccount = { onResult ->
+                            viewModel.deleteUserAccount(onResult)
+                        },
                         onLogoutClick = { viewModel.logout() }
                     )
                 }
@@ -121,6 +138,7 @@ fun TuCanchaApp(viewModel: MainViewModel) {
                     if (!isPaymentStepOpen) {
                         BookingBottomSheet(
                             court = court,
+                            existingReservations = reservations,
                             selectedDay = selectedDay,
                             onDaySelected = { viewModel.selectDay(it) },
                             selectedTimeSlot = selectedTimeSlot,

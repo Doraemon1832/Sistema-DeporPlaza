@@ -57,7 +57,8 @@ import com.example.tucancha.ui.theme.UnavailableRed
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (name: String, email: String, role: UserRole) -> Unit,
+    onLoginClick: (email: String, password: String, role: UserRole, onError: (String) -> Unit) -> Unit,
+    onRegisterClick: (name: String, email: String, password: String, role: UserRole, onError: (String) -> Unit) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isRegisteringMode by remember { mutableStateOf(false) }
@@ -153,6 +154,7 @@ fun LoginScreen(
                         .clickable {
                             selectedRole = UserRole.USUARIO
                             email = "alejandro@email.com"
+                            password = "123456"
                             errorMessage = null
                         }
                         .padding(vertical = 12.dp),
@@ -185,6 +187,7 @@ fun LoginScreen(
                         .clickable {
                             selectedRole = UserRole.ADMINISTRADOR
                             email = "admin@deporplaza.com"
+                            password = "123456"
                             isRegisteringMode = false
                             errorMessage = null
                         }
@@ -283,7 +286,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = fullName,
                     onValueChange = {
-                        fullName = it
+                        fullName = it.replace(Regex("['\";\\-\\-\\/\\*]"), "")
                         errorMessage = null
                     },
                     placeholder = { Text(text = "Ej. Carlos Mendoza", color = TextSecondary) },
@@ -322,7 +325,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = email,
                 onValueChange = {
-                    email = it
+                    email = it.replace(Regex("['\";\\-\\-\\/\\*]"), "")
                     errorMessage = null
                 },
                 leadingIcon = {
@@ -359,7 +362,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = {
-                    password = it
+                    password = it.replace(Regex("['\";\\-\\-\\/\\*]"), "")
                     errorMessage = null
                 },
                 leadingIcon = {
@@ -399,7 +402,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = confirmPassword,
                     onValueChange = {
-                        confirmPassword = it
+                        confirmPassword = it.replace(Regex("['\";\\-\\-\\/\\*]"), "")
                         errorMessage = null
                     },
                     leadingIcon = {
@@ -448,18 +451,21 @@ fun LoginScreen(
                             errorMessage = "Las contraseñas no coinciden"
                             return@Button
                         }
-                        onLoginSuccess(fullName, email, selectedRole)
+                        onRegisterClick(fullName, email, password, selectedRole) { err ->
+                            errorMessage = err
+                        }
                     } else {
                         if (email.isBlank()) {
                             errorMessage = "Por favor ingresa tu correo"
                             return@Button
                         }
-                        val derivedName = if (selectedRole == UserRole.ADMINISTRADOR) {
-                            "Administrador DeporPlaza"
-                        } else {
-                            if (email.contains("alejandro")) "Alejandro Torres" else email.substringBefore("@")
+                        if (password.isBlank()) {
+                            errorMessage = "Por favor ingresa tu contraseña"
+                            return@Button
                         }
-                        onLoginSuccess(derivedName, email, selectedRole)
+                        onLoginClick(email, password, selectedRole) { err ->
+                            errorMessage = err
+                        }
                     }
                 },
                 modifier = Modifier

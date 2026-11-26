@@ -1,5 +1,6 @@
 package com.example.tucancha.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -29,6 +32,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,10 +69,23 @@ fun ProfileScreen(
     userProfile: UserProfile,
     reservations: List<Reservation>,
     onCancelReservation: (String) -> Unit,
+    onUpdateProfile: (newNombre: String, newEmail: String, onResult: (Boolean, String) -> Unit) -> Unit,
+    onDeleteAccount: (onResult: (Boolean) -> Unit) -> Unit,
     onLogoutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var reservationToCancelId by remember { mutableStateOf<String?>(null) }
+    var isEditProfileOpen by remember { mutableStateOf(false) }
+    var isDeleteAccountOpen by remember { mutableStateOf(false) }
+
+    var editName by remember { mutableStateOf(userProfile.name) }
+    var editEmail by remember { mutableStateOf(userProfile.email) }
+    var editErrorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Filtrar únicamente las reservas del usuario actualmente conectado
+    val userReservations = reservations.filter {
+        it.userName.equals(userProfile.name, ignoreCase = true)
+    }
 
     Column(
         modifier = modifier
@@ -81,7 +100,7 @@ fun ProfileScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Mis reservas",
+                text = "Mi Perfil",
                 color = TextPrimary,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold
@@ -105,60 +124,113 @@ fun ProfileScreen(
 
         // User Profile Card
         val profileShape = RoundedCornerShape(20.dp)
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .clip(profileShape)
                 .background(DarkSurface)
                 .border(1.dp, DarkCardBorder, profileShape)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(DeporYellowPrimary),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = userProfile.avatarLetter,
-                    color = Color.Black,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(DeporYellowPrimary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = userProfile.avatarLetter,
+                        color = Color.Black,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = userProfile.name,
+                        color = TextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = userProfile.email,
+                        color = TextSecondary,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = StarYellow,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = userProfile.badge,
+                            color = DeporYellowPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = {
+                        editName = userProfile.name
+                        editEmail = userProfile.email
+                        editErrorMessage = null
+                        isEditProfileOpen = true
+                    },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF262B30))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Editar perfil",
+                        tint = DeporYellowPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Column {
-                Text(
-                    text = userProfile.name,
-                    color = TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = userProfile.email,
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+            // Eliminar mi cuenta Button
+            OutlinedButton(
+                onClick = { isDeleteAccountOpen = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(38.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = UnavailableRed),
+                border = BorderStroke(1.dp, UnavailableRed.copy(alpha = 0.5f))
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Star,
+                        imageVector = Icons.Default.DeleteForever,
                         contentDescription = null,
-                        tint = StarYellow,
-                        modifier = Modifier.size(14.dp)
+                        tint = UnavailableRed,
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = userProfile.badge,
-                        color = DeporYellowPrimary,
+                        text = "Eliminar mi cuenta",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = UnavailableRed
                     )
                 }
             }
@@ -168,7 +240,7 @@ fun ProfileScreen(
 
         // Section Title: MIS RESERVAS (X)
         Text(
-            text = "MIS RESERVAS (${reservations.size})",
+            text = "MIS RESERVAS (${userReservations.size})",
             color = TextSecondary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
@@ -178,7 +250,7 @@ fun ProfileScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (reservations.isEmpty()) {
+        if (userReservations.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -214,7 +286,7 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                items(reservations, key = { it.id }) { reservation ->
+                items(userReservations, key = { it.id }) { reservation ->
                     ReservationCard(
                         reservation = reservation,
                         onCancelClick = { reservationToCancelId = reservation.id }
@@ -224,7 +296,134 @@ fun ProfileScreen(
         }
     }
 
-    // Cancel Confirmation Dialog
+    // Edit Profile Dialog Modal
+    if (isEditProfileOpen) {
+        AlertDialog(
+            onDismissRequest = { isEditProfileOpen = false },
+            containerColor = DarkSurface,
+            title = {
+                Text(
+                    text = "Editar perfil",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    editErrorMessage?.let { err ->
+                        Text(
+                            text = err,
+                            color = UnavailableRed,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    Text(text = "Nombre completo", color = TextSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it; editErrorMessage = null },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = DeporYellowPrimary,
+                            unfocusedBorderColor = DarkCardBorder,
+                            focusedContainerColor = Color(0xFF121518),
+                            unfocusedContainerColor = Color(0xFF121518),
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(text = "Correo electrónico", color = TextSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = editEmail,
+                        onValueChange = { editEmail = it; editErrorMessage = null },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = DeporYellowPrimary,
+                            unfocusedBorderColor = DarkCardBorder,
+                            focusedContainerColor = Color(0xFF121518),
+                            unfocusedContainerColor = Color(0xFF121518),
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onUpdateProfile(editName, editEmail) { exito, msg ->
+                            if (exito) {
+                                isEditProfileOpen = false
+                            } else {
+                                editErrorMessage = msg
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DeporYellowPrimary, contentColor = Color.Black),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(text = "Guardar cambios", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isEditProfileOpen = false }) {
+                    Text(text = "Cancelar", color = TextSecondary)
+                }
+            }
+        )
+    }
+
+    // Delete Account Confirmation Dialog Modal
+    if (isDeleteAccountOpen) {
+        AlertDialog(
+            onDismissRequest = { isDeleteAccountOpen = false },
+            containerColor = DarkSurface,
+            title = {
+                Text(
+                    text = "⚠️ ¿Eliminar cuenta de DeporPlaza?",
+                    color = UnavailableRed,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Esta acción eliminará permanentemente tu usuario y todas tus reservas asociadas de MySQL Workbench. ¿Deseas continuar?",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteAccount { exito ->
+                            isDeleteAccountOpen = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = UnavailableRed, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(text = "Sí, eliminar cuenta", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isDeleteAccountOpen = false }) {
+                    Text(text = "Cancelar", color = TextSecondary)
+                }
+            }
+        )
+    }
+
+    // Cancel Reservation Confirmation Dialog
     if (reservationToCancelId != null) {
         AlertDialog(
             onDismissRequest = { reservationToCancelId = null },
