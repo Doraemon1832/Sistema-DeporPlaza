@@ -65,8 +65,8 @@ fun LoginScreen(
     var selectedRole by remember { mutableStateOf(UserRole.USUARIO) }
 
     var fullName by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("alejandro@email.com") }
-    var password by remember { mutableStateOf("123456") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -153,8 +153,8 @@ fun LoginScreen(
                         .background(if (isUsuario) DeporYellowPrimary else Color.Transparent)
                         .clickable {
                             selectedRole = UserRole.USUARIO
-                            email = "alejandro@email.com"
-                            password = "123456"
+                            email = ""
+                            password = ""
                             errorMessage = null
                         }
                         .padding(vertical = 12.dp),
@@ -186,8 +186,8 @@ fun LoginScreen(
                         .background(if (isAdmin) DeporYellowPrimary else Color.Transparent)
                         .clickable {
                             selectedRole = UserRole.ADMINISTRADOR
-                            email = "admin@deporplaza.com"
-                            password = "123456"
+                            email = ""
+                            password = ""
                             isRegisteringMode = false
                             errorMessage = null
                         }
@@ -289,7 +289,7 @@ fun LoginScreen(
                         fullName = it.replace(Regex("['\";\\-\\-\\/\\*]"), "")
                         errorMessage = null
                     },
-                    placeholder = { Text(text = "Ej. Carlos Mendoza", color = TextSecondary) },
+                    placeholder = { Text(text = "Ej. Carlos Mendoza", color = TextSecondary.copy(alpha = 0.5f)) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Person,
@@ -328,6 +328,7 @@ fun LoginScreen(
                     email = it.replace(Regex("['\";\\-\\-\\/\\*]"), "")
                     errorMessage = null
                 },
+                placeholder = { Text(text = "ejemplo@correo.com", color = TextSecondary.copy(alpha = 0.5f)) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Email,
@@ -365,6 +366,7 @@ fun LoginScreen(
                     password = it.replace(Regex("['\";\\-\\-\\/\\*]"), "")
                     errorMessage = null
                 },
+                placeholder = { Text(text = "••••••••", color = TextSecondary.copy(alpha = 0.5f)) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Lock,
@@ -405,6 +407,7 @@ fun LoginScreen(
                         confirmPassword = it.replace(Regex("['\";\\-\\-\\/\\*]"), "")
                         errorMessage = null
                     },
+                    placeholder = { Text(text = "••••••••", color = TextSecondary.copy(alpha = 0.5f)) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Lock,

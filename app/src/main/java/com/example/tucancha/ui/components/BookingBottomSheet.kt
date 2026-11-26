@@ -32,6 +32,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +55,9 @@ import com.example.tucancha.ui.theme.TextPrimary
 import com.example.tucancha.ui.theme.TextSecondary
 import com.example.tucancha.ui.theme.UnavailableButtonBackground
 import com.example.tucancha.ui.theme.UnavailableButtonText
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,11 +75,37 @@ fun BookingBottomSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Calculate taken slots for selected court & day
-    val occupiedTimeSlots = existingReservations
+    // Sincronización con la fecha y hora real del sistema
+    val nowCalendar = Calendar.getInstance()
+    val hoyFechaStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(nowCalendar.time)
+    val currentHour = nowCalendar.get(Calendar.HOUR_OF_DAY)
+    val esHoy = selectedDay.fullDate == hoyFechaStr
+
+    // Cálculo dinámico de turnos ocupados por duración (ej. 7am por 3h ocupa 7, 8 y 9)
+    val occupiedTimeSlots = mutableSetOf<String>()
+    val pastTimeSlots = mutableSetOf<String>()
+
+    existingReservations
         .filter { it.court.id == court.id && it.date == selectedDay.fullDate && it.status != ReservationStatus.CANCELADA }
-        .map { it.startTime }
-        .toSet()
+        .forEach { res ->
+            val startHour = res.startTime.split(":").firstOrNull()?.toIntOrNull() ?: return@forEach
+            val durationHoursInt = Math.ceil(res.durationHours).toInt()
+            for (h in startHour until (startHour + durationHoursInt)) {
+                val timeFormatted = String.format(Locale.getDefault(), "%02d:00", h)
+                occupiedTimeSlots.add(timeFormatted)
+            }
+        }
+
+    if (esHoy) {
+        MockData.sampleTimeSlots.forEach { time ->
+            val hour = time.split(":").firstOrNull()?.toIntOrNull() ?: 0
+            if (hour <= currentHour) {
+                pastTimeSlots.add(time)
+            }
+        }
+    }
+
+    val dynamicDays = remember { MockData.obtenerDiasDinamicos(14) }
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -186,7 +216,7 @@ fun BookingBottomSheet(
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(MockData.sampleDays) { day ->
+                items(items = dynamicDays, key = { it.fullDate }) { day ->
                     val isSelected = day.fullDate == selectedDay.fullDate
                     val shape = RoundedCornerShape(14.dp)
 
@@ -232,9 +262,10 @@ fun BookingBottomSheet(
                     letterSpacing = 1.sp
                 )
 
-                if (occupiedTimeSlots.isNotEmpty()) {
+                if (occupiedTimeSlots.isNotEmpty() || pastTimeSlots.isNotEmpty()) {
+                    val totalBlocked = occupiedTimeSlots.size + pastTimeSlots.size
                     Text(
-                        text = "🔒 ${occupiedTimeSlots.size} turno(s) ocupado(s)",
+                        text = "🔒 $totalBlocked turno(s) no disponible(s)",
                         color = Color(0xFFFFB74D),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
@@ -253,17 +284,22 @@ fun BookingBottomSheet(
             ) {
                 items(MockData.sampleTimeSlots) { time ->
                     val isOccupied = occupiedTimeSlots.contains(time)
-                    val isSelected = time == selectedTimeSlot && !isOccupied
+                    val isPast = pastTimeSlots.contains(time)
+                    val isUnavailable = isOccupied || isPast
+
+                    val isSelected = time == selectedTimeSlot && !isUnavailable
                     val shape = RoundedCornerShape(10.dp)
 
                     val bgColor = when {
                         isOccupied -> Color(0xFF2C2424)
+                        isPast -> Color(0xFF1F2225)
                         isSelected -> DeporYellowPrimary
                         else -> Color(0xFF1E2328)
                     }
 
                     val borderColor = when {
                         isOccupied -> Color(0xFF5A2A2A)
+                        isPast -> Color(0xFF2E3236)
                         isSelected -> DeporYellowPrimary
                         else -> DarkCardBorder
                     }
@@ -273,7 +309,7 @@ fun BookingBottomSheet(
                             .clip(shape)
                             .background(bgColor)
                             .border(1.dp, borderColor, shape)
-                            .clickable(enabled = !isOccupied) { onTimeSlotSelected(time) }
+                            .clickable(enabled = !isUnavailable) { onTimeSlotSelected(time) }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -282,17 +318,25 @@ fun BookingBottomSheet(
                                 text = time,
                                 color = when {
                                     isOccupied -> Color(0xFF886666)
+                                    isPast -> Color(0xFF555B61)
                                     isSelected -> Color.Black
                                     else -> TextPrimary
                                 },
                                 fontSize = 13.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                textDecoration = if (isOccupied) TextDecoration.LineThrough else TextDecoration.None
+                                textDecoration = if (isUnavailable) TextDecoration.LineThrough else TextDecoration.None
                             )
                             if (isOccupied) {
                                 Text(
                                     text = "Ocupado",
                                     color = Color(0xFFEF5350),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            } else if (isPast) {
+                                Text(
+                                    text = "Cerrado",
+                                    color = Color(0xFF78909C),
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -396,7 +440,10 @@ fun BookingBottomSheet(
             Spacer(modifier = Modifier.height(20.dp))
 
             // Button Continuar al pago
-            val isButtonEnabled = selectedTimeSlot != null && !occupiedTimeSlots.contains(selectedTimeSlot)
+            val isButtonEnabled = selectedTimeSlot != null &&
+                    !occupiedTimeSlots.contains(selectedTimeSlot) &&
+                    !pastTimeSlots.contains(selectedTimeSlot)
+
             Button(
                 onClick = onContinueToPaymentClick,
                 enabled = isButtonEnabled,
