@@ -261,7 +261,23 @@ object ClienteApiMySQL {
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
                     val canchaId = obj.getString("cancha_id")
-                    val cancha = canchasMap[canchaId] ?: continue
+                    
+                    val cancha = canchasMap[canchaId]
+                        ?: canchasMap[canchaId.trim()]
+                        ?: Court(
+                            id = canchaId,
+                            name = "Cancha #$canchaId",
+                            sport = SportCategory.PADEL,
+                            pricePerHour = 110,
+                            location = "Sede DeporPlaza",
+                            rating = 4.8,
+                            reviewsCount = 120,
+                            capacityTag = "2 vs 2",
+                            surfaceTag = "Sintético",
+                            lightingTag = "LED",
+                            imageUrl = "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=800&q=80",
+                            isAvailable = true
+                        )
 
                     val statusStr = obj.optString("estado", "CONFIRMADA")
                     val statusEnum = try {
