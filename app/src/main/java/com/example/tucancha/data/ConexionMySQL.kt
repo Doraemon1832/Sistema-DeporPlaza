@@ -19,7 +19,7 @@ object ConexionMySQL {
     private var puerto: String = "3306"
     private var baseDatos: String = "tucancha_db"
     private var usuarioBD: String = "root"
-    private var claveBD: String = "Fernanda11:11"
+    private var claveBD: String = "root"
 
     fun cambiarConfiguracion(nuevoHost: String, nuevoPuerto: String = "3306", nuevoUsuario: String = "root", nuevaClave: String = "Fernanda11:11") {
         host = nuevoHost
